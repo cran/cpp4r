@@ -1,6 +1,6 @@
-#' Vendor the cpp4r headers
+#' @title Vendor the cpp4r headers
 #'
-#' Vendoring is the act of making your own copy of the 3rd party packages your
+#' @description Vendoring is the act of making your own copy of the 3rd party packages your
 #' project is using. It is often used in the go language community.
 #'
 #' This function vendors cpp4r into your package by copying the cpp4r
@@ -12,22 +12,23 @@
 #' **you**. Bugfixes and new features in cpp4r will not be available for your
 #' code until you run `cpp_vendor()` again.
 #'
-#' @param path The directory to vendor the headers into
+#' @param path The directory with the vendored headers. It is recommended to use `"./src/vendor"`.
+#' The default is `NULL`.
 #' @return The path to the vendored code (invisibly).
 #' @export
 #' @examples
 #' # create a new directory
 #' dir <- paste0(tempdir(), "/", gsub("\\s+|[[:punct:]]", "", Sys.time()))
-#' dir.create(dir, recursive = TRUE)
+#' dir.create(dir, recursive = TRUE, showWarnings = FALSE)
 #'
 #' # vendor the cpp4r headers into the directory
 #' vendor(dir)
 #'
-#' list.files(file.path(dir, "src", "vendor"))
+#' list.files(dir, recursive = TRUE)
 #'
 #' # cleanup
 #' unlink(dir, recursive = TRUE)
-vendor <- function(path = "./src/vendor") {
+vendor <- function(path = NULL) {
   if (is.null(path)) {
     stop("You must provide a path to vendor the code into", call. = FALSE)
   }

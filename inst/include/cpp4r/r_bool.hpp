@@ -1,69 +1,55 @@
 #pragma once
 
-#include <limits>  // for numeric_limits
+#include <limits>
 #include <ostream>
-#include <type_traits>  // for is_convertible, enable_if
+#include <type_traits>
 
-#include "R_ext/Boolean.h"    // for Rboolean
-#include "cpp4r/R.hpp"        // for SEXP, SEXPREC, ...
-#include "cpp4r/as.hpp"       // for as_sexp
-#include "cpp4r/protect.hpp"  // for unwind_protect
+#include "R_ext/Boolean.h"
+#include "cpp4r/R.hpp"
+#include "cpp4r/as.hpp"
+#include "cpp4r/protect.hpp"
 #include "cpp4r/r_vector.hpp"
-#include "cpp4r/sexp.hpp"  // for sexp
+#include "cpp4r/sexp.hpp"
 
 namespace cpp4r {
 
 class r_bool {
  public:
-  r_bool() = default;
+  r_bool() noexcept = default;
 
   r_bool(SEXP data) {
-    if (__builtin_expect(Rf_isLogical(data) && Rf_xlength(data) == 1, 1)) {
+    if (Rf_isLogical(data) && Rf_xlength(data) == 1) {
       value_ = static_cast<Rboolean>(LOGICAL_ELT(data, 0));
       return;
     }
     throw std::invalid_argument("Invalid r_bool value");
   }
 
-  constexpr r_bool(bool value) noexcept : value_(value ? TRUE : FALSE) {}
-  constexpr r_bool(Rboolean value) noexcept : value_(value) {}
-  constexpr r_bool(int value) noexcept : value_(from_int(value)) {}
+  r_bool(bool value) noexcept : value_(value ? TRUE : FALSE) {}
+  r_bool(Rboolean value) noexcept : value_(value) {}
+  r_bool(int value) noexcept : value_(from_int(value)) {}
 
-  constexpr operator bool() const noexcept { return value_ == TRUE; }
-  constexpr operator int() const noexcept { return value_; }
-  constexpr operator Rboolean() const noexcept { return value_ ? TRUE : FALSE; }
+  operator bool() const noexcept { return value_ == TRUE; }
+  operator int() const noexcept { return value_; }
+  operator Rboolean() const noexcept { return value_ ? TRUE : FALSE; }
 
-  constexpr bool operator==(r_bool rhs) const noexcept { return value_ == rhs.value_; }
-  constexpr bool operator==(bool rhs) const noexcept { return operator==(r_bool(rhs)); }
-  constexpr bool operator==(Rboolean rhs) const noexcept {
-    return operator==(r_bool(rhs));
-  }
-  constexpr bool operator==(int rhs) const noexcept { return operator==(r_bool(rhs)); }
-
-  constexpr bool operator!=(r_bool rhs) const noexcept { return !operator==(rhs); }
-  constexpr bool operator!=(bool rhs) const noexcept { return !operator==(rhs); }
-  constexpr bool operator!=(Rboolean rhs) const noexcept { return !operator==(rhs); }
-  constexpr bool operator!=(int rhs) const noexcept { return !operator==(rhs); }
-
-  constexpr bool is_na() const noexcept { return value_ == na; }
+  bool operator==(r_bool rhs) const noexcept { return value_ == rhs.value_; }
+  bool operator==(bool rhs) const noexcept { return operator==(r_bool(rhs)); }
+  bool operator==(Rboolean rhs) const noexcept { return operator==(r_bool(rhs)); }
+  bool operator==(int rhs) const noexcept { return operator==(r_bool(rhs)); }
 
  private:
   static constexpr int na = std::numeric_limits<int>::min();
-
   static constexpr int from_int(int value) noexcept {
-    return (value == static_cast<int>(FALSE)) ? FALSE : 
-           (value == static_cast<int>(na)) ? na : TRUE;
+    return (value == static_cast<int>(FALSE)) ? FALSE
+           : (value == static_cast<int>(na))  ? na
+                                              : TRUE;
   }
-
   int value_ = na;
 };
 
 inline std::ostream& operator<<(std::ostream& os, r_bool const& value) {
-  if (__builtin_expect(value.is_na(), 0)) {
-    os << "NA";
-  } else {
-    os << (static_cast<bool>(value) ? "TRUE" : "FALSE");
-  }
+  os << ((value == TRUE) ? "TRUE" : "FALSE");
   return os;
 }
 

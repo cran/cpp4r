@@ -85,7 +85,7 @@ struct is_std_complex<std::complex<T>> : std::true_type {};
 
 // https://stackoverflow.com/a/1521682/2055486
 //
-inline bool is_convertible_without_loss_to_integer(double value) noexcept {
+inline bool is_convertible_without_loss_to_integer(double value) {
   double int_part;
   return std::modf(value, &int_part) == 0.0;
 }
@@ -102,23 +102,25 @@ enable_if_is_sexp<T, T> as_cpp(SEXP from) {
 
 template <typename T>
 enable_if_integral<T, T> as_cpp(SEXP from) {
-  if (__builtin_expect(Rf_xlength(from) != 1, 0)) {
-    throw std::length_error("Expected single integer value");
-  }
-
-  if (__builtin_expect(Rf_isInteger(from), 1)) {
-    return INTEGER_ELT(from, 0);
-  } else if (__builtin_expect(Rf_isReal(from), 0)) {
-    if (__builtin_expect(ISNA(REAL_ELT(from, 0)), 0)) {
-      return NA_INTEGER;
+  if (Rf_isInteger(from)) {
+    if (Rf_xlength(from) == 1) {
+      return INTEGER_ELT(from, 0);
     }
-    double value = REAL_ELT(from, 0);
-    if (__builtin_expect(is_convertible_without_loss_to_integer(value), 1)) {
-      return value;
+  } else if (Rf_isReal(from)) {
+    if (Rf_xlength(from) == 1) {
+      if (ISNA(REAL_ELT(from, 0))) {
+        return NA_INTEGER;
+      }
+      double value = REAL_ELT(from, 0);
+      if (is_convertible_without_loss_to_integer(value)) {
+        return value;
+      }
     }
-  } else if (__builtin_expect(Rf_isLogical(from), 0)) {
-    if (__builtin_expect(LOGICAL_ELT(from, 0) == NA_LOGICAL, 0)) {
-      return NA_INTEGER;
+  } else if (Rf_isLogical(from)) {
+    if (Rf_xlength(from) == 1) {
+      if (LOGICAL_ELT(from, 0) == NA_LOGICAL) {
+        return NA_INTEGER;
+      }
     }
   }
 
@@ -141,8 +143,10 @@ enable_if_enum<E, E> as_cpp(SEXP from) {
 
 template <typename T>
 enable_if_bool<T, T> as_cpp(SEXP from) {
-  if (__builtin_expect(Rf_isLogical(from) && Rf_xlength(from) == 1, 1)) {
-    return LOGICAL_ELT(from, 0) == 1;
+  if (Rf_isLogical(from)) {
+    if (Rf_xlength(from) == 1) {
+      return LOGICAL_ELT(from, 0) == 1;
+    }
   }
 
   throw std::length_error("Expected single logical value");
@@ -150,38 +154,48 @@ enable_if_bool<T, T> as_cpp(SEXP from) {
 
 template <typename T>
 enable_if_floating_point<T, T> as_cpp(SEXP from) {
-  if (__builtin_expect(Rf_xlength(from) != 1, 0)) {
-    throw std::length_error("Expected single double value");
-  }
-
-  if (__builtin_expect(Rf_isReal(from), 1)) {
-    return REAL_ELT(from, 0);
+  if (Rf_isReal(from)) {
+    if (Rf_xlength(from) == 1) {
+      return REAL_ELT(from, 0);
+    }
   }
   // All 32 bit integers can be coerced to doubles, so we just convert them.
-  if (__builtin_expect(Rf_isInteger(from), 0)) {
-    if (__builtin_expect(INTEGER_ELT(from, 0) == NA_INTEGER, 0)) {
-      return NA_REAL;
+  if (Rf_isInteger(from)) {
+    if (Rf_xlength(from) == 1) {
+      if (INTEGER_ELT(from, 0) == NA_INTEGER) {
+        return NA_REAL;
+      }
+      return INTEGER_ELT(from, 0);
     }
-    return INTEGER_ELT(from, 0);
   }
 
   // Also allow NA values
-  if (__builtin_expect(Rf_isLogical(from), 0)) {
-    if (__builtin_expect(LOGICAL_ELT(from, 0) == NA_LOGICAL, 0)) {
-      return NA_REAL;
+  if (Rf_isLogical(from)) {
+    if (Rf_xlength(from) == 1) {
+      if (LOGICAL_ELT(from, 0) == NA_LOGICAL) {
+        return NA_REAL;
+      }
     }
   }
 
   throw std::length_error("Expected single double value");
 }
 
-// Removed generic complex template to avoid ambiguity - use specific specializations
-// instead
+// Definition for converting SEXP to std::complex<double>
+inline std::complex<double> as_cpp(SEXP x) {
+  if (TYPEOF(x) != CPLXSXP || Rf_length(x) != 1) {
+    throw std::invalid_argument("Expected a single complex number.");
+  }
+  Rcomplex c = COMPLEX(x)[0];
+  return {c.r, c.i};
+}
 
 template <typename T>
 enable_if_char<T, T> as_cpp(SEXP from) {
-  if (__builtin_expect(Rf_isString(from) && Rf_xlength(from) == 1, 1)) {
-    return unwind_protect([&] { return Rf_translateCharUTF8(STRING_ELT(from, 0))[0]; });
+  if (Rf_isString(from)) {
+    if (Rf_xlength(from) == 1) {
+      return unwind_protect([&] { return Rf_translateCharUTF8(STRING_ELT(from, 0))[0]; });
+    }
   }
 
   throw std::length_error("Expected string vector of length 1");
@@ -189,15 +203,17 @@ enable_if_char<T, T> as_cpp(SEXP from) {
 
 template <typename T>
 enable_if_c_string<T, T> as_cpp(SEXP from) {
-  if (__builtin_expect(Rf_isString(from) && Rf_xlength(from) == 1, 1)) {
-    void* vmax = vmaxget();
+  if (Rf_isString(from)) {
+    if (Rf_xlength(from) == 1) {
+      void* vmax = vmaxget();
 
-    const char* result =
-        unwind_protect([&] { return Rf_translateCharUTF8(STRING_ELT(from, 0)); });
+      const char* result =
+          unwind_protect([&] { return Rf_translateCharUTF8(STRING_ELT(from, 0)); });
 
-    vmaxset(vmax);
+      vmaxset(vmax);
 
-    return {result};
+      return {result};
+    }
   }
 
   throw std::length_error("Expected string vector of length 1");
@@ -208,28 +224,33 @@ enable_if_std_string<T, T> as_cpp(SEXP from) {
   return {as_cpp<const char*>(from)};
 }
 
-// Specialization for converting std::complex<T> to SEXP
+// Temporary workaround for compatibility with cpp4r 0.1.0
 template <typename T>
-inline SEXP as_sexp(const std::complex<T>& x) {
+enable_if_t<!std::is_same<decay_t<T>, T>::value, decay_t<T>> as_cpp(SEXP from) {
+  return as_cpp<decay_t<T>>(from);
+}
+
+template <typename T>
+enable_if_integral<T, SEXP> as_sexp(T from) {
+  return safe[Rf_ScalarInteger](from);
+}
+
+template <typename T>
+enable_if_floating_point<T, SEXP> as_sexp(T from) {
+  return safe[Rf_ScalarReal](from);
+}
+
+// Specialization for converting std::complex<double> to SEXP
+inline SEXP as_sexp(const std::complex<double>& x) {
   SEXP result = PROTECT(Rf_allocVector(CPLXSXP, 1));
-  COMPLEX(result)[0].r = static_cast<double>(x.real());
-  COMPLEX(result)[0].i = static_cast<double>(x.imag());
+  COMPLEX(result)[0].r = x.real();
+  COMPLEX(result)[0].i = x.imag();
   UNPROTECT(1);
   return result;
 }
 
 template <typename T>
-enable_if_integral<T, SEXP> as_sexp(T from) noexcept {
-  return safe[Rf_ScalarInteger](from);
-}
-
-template <typename T>
-enable_if_floating_point<T, SEXP> as_sexp(T from) noexcept {
-  return safe[Rf_ScalarReal](from);
-}
-
-template <typename T>
-enable_if_bool<T, SEXP> as_sexp(T from) noexcept {
+enable_if_bool<T, SEXP> as_sexp(T from) {
   return safe[Rf_ScalarLogical](from);
 }
 
@@ -244,14 +265,15 @@ enable_if_std_string<T, SEXP> as_sexp(const T& from) {
 }
 
 template <typename Container, typename T = typename Container::value_type,
-          typename = disable_if_convertible_to_sexp<Container>>
+          typename = disable_if_convertible_to_sexp<Container>,
+          typename = enable_if_t<!is_std_complex<Container>::value>>
 enable_if_integral<T, SEXP> as_sexp(const Container& from) {
   R_xlen_t size = from.size();
   SEXP data = safe[Rf_allocVector](INTSXP, size);
 
   auto it = from.begin();
   int* data_p = INTEGER(data);
-  for (R_xlen_t i = 0; __builtin_expect(i < size, 1); ++i, ++it) {
+  for (R_xlen_t i = 0; i < size; ++i, ++it) {
     data_p[i] = *it;
   }
   return data;
@@ -270,7 +292,7 @@ enable_if_floating_point<T, SEXP> as_sexp(const Container& from) {
 
   auto it = from.begin();
   double* data_p = REAL(data);
-  for (R_xlen_t i = 0; __builtin_expect(i < size, 1); ++i, ++it) {
+  for (R_xlen_t i = 0; i < size; ++i, ++it) {
     data_p[i] = *it;
   }
   return data;
@@ -289,7 +311,7 @@ enable_if_bool<T, SEXP> as_sexp(const Container& from) {
 
   auto it = from.begin();
   int* data_p = LOGICAL(data);
-  for (R_xlen_t i = 0; __builtin_expect(i < size, 1); ++i, ++it) {
+  for (R_xlen_t i = 0; i < size; ++i, ++it) {
     data_p[i] = *it;
   }
   return data;

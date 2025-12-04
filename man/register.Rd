@@ -21,13 +21,9 @@ The paths to the generated R and C++ source files (in that order).
 Functions decorated with \verb{[[cpp4r::register]]} in files ending in \code{.cc},
 \code{.cpp}, \code{.h} or \code{.hpp} will be wrapped in generated code and registered to
 be called from R.
-}
-\details{
+
 Note registered functions will not be \emph{exported} from your package unless
 you also add a \verb{@export} roxygen2 directive for them.
-
-In order to use \code{register()} the \code{cli}, \code{decor}, \code{desc}, \code{glue},
-\code{tibble} and \code{vctrs} packages must also be installed.
 }
 \examples{
 # create a minimal package

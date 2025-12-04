@@ -1,7 +1,6 @@
 ABI
 ALTREP
 Anticonf
-Armadiilo
 Autoconf
 Bugfixes
 BuyMeACoffee
@@ -73,7 +72,6 @@ natively
 neq
 nullable
 parallelization
-permisive
 pragma
 r's
 rarmadillo
@@ -105,5 +103,4 @@ vdots
 vectorization
 vendored
 vendoring
-woul
 ’s

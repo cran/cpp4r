@@ -1,72 +1,43 @@
 #pragma once
 
-#include <cstring>      // for strcmp, strlen
-#include <string>       // for string, basic_string, operator==
-#include <type_traits>  // for is_convertible, enable_if
-#include <utility>      // for move
+#include <string>
+#include <type_traits>
 
-#include "R_ext/Memory.h"     // for vmaxget, vmaxset
-#include "cpp4r/R.hpp"        // for SEXP, SEXPREC, Rf_mkCharCE, Rf_translat...
-#include "cpp4r/as.hpp"       // for as_sexp
-#include "cpp4r/protect.hpp"  // for unwind_protect, protect, protect::function
-#include "cpp4r/sexp.hpp"     // for sexp
+#include "R_ext/Memory.h"
+#include "cpp4r/R.hpp"
+#include "cpp4r/as.hpp"
+#include "cpp4r/protect.hpp"
+#include "cpp4r/sexp.hpp"
 
 namespace cpp4r {
 
 class r_string {
  public:
   r_string() = default;
-  r_string(SEXP data) : data_(data) {}
+  r_string(SEXP data) noexcept : data_(data) {}
   r_string(const char* data) : data_(safe[Rf_mkCharCE](data, CE_UTF8)) {}
   r_string(const std::string& data)
       : data_(safe[Rf_mkCharLenCE](data.c_str(), data.size(), CE_UTF8)) {}
 
-  // Copy constructor
-  r_string(const r_string& other) : data_(other.data_) {}
-
-  // Copy assignment
-  r_string& operator=(const r_string& other) {
-    if (this != &other) {
-      data_ = other.data_;
-    }
-    return *this;
-  }
-
-  // Move constructor
-  r_string(r_string&& other) noexcept : data_(other.data_) { other.data_ = R_NilValue; }
-
-  // Move assignment
-  r_string& operator=(r_string&& other) noexcept {
-    if (this != &other) {
-      data_ = other.data_;
-      other.data_ = R_NilValue;
-    }
-    return *this;
-  }
-
   operator SEXP() const noexcept { return data_; }
   operator sexp() const noexcept { return data_; }
+
   operator std::string() const {
     std::string res;
     res.reserve(size());
-
     void* vmax = vmaxget();
     unwind_protect([&] { res.assign(Rf_translateCharUTF8(data_)); });
     vmaxset(vmax);
-
     return res;
   }
 
   bool operator==(const r_string& rhs) const noexcept {
     return data_.data() == rhs.data_.data();
   }
-
   bool operator==(const SEXP rhs) const noexcept { return data_.data() == rhs; }
-
   bool operator==(const char* rhs) const {
     return static_cast<std::string>(*this) == rhs;
   }
-
   bool operator==(const std::string& rhs) const {
     return static_cast<std::string>(*this) == rhs;
   }
@@ -79,7 +50,6 @@ class r_string {
 
 inline SEXP as_sexp(std::initializer_list<r_string> il) {
   R_xlen_t size = il.size();
-
   sexp data;
   unwind_protect([&] {
     data = Rf_allocVector(STRSXP, size);
@@ -104,14 +74,12 @@ enable_if_r_string<T, SEXP> as_sexp(T from) {
   sexp res;
   unwind_protect([&] {
     res = Rf_allocVector(STRSXP, 1);
-
     if (str == NA_STRING) {
       SET_STRING_ELT(res, 0, str);
     } else {
       SET_STRING_ELT(res, 0, Rf_mkCharCE(Rf_translateCharUTF8(str), CE_UTF8));
     }
   });
-
   return res;
 }
 

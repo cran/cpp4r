@@ -1,6 +1,6 @@
 Package: cpp4r
 Title: Header-Only 'C++' and 'R' Interface
-Version: 0.3.0
+Version: 0.4.0
 Authors@R: c(
     person("Mauricio", "Vargas Sepulveda", , "m.vargas.sepulveda@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-1017-7574")),
@@ -18,19 +18,16 @@ License: Apache License (>= 2)
 URL: https://cpp4r.org, https://github.com/pachadotdev/cpp4r
 BugReports: https://github.com/pachadotdev/cpp4r/issues
 Depends: R (>= 4.0.0)
-Imports: brio, cli, decor, desc, glue, tibble, tools, utils, vctrs,
-        withr
+Imports: decor, desc, glue, tibble, tools, utils, vctrs, withr
 Suggests: mockery, roxygen2, testthat (>= 3.2.0)
-Config/Needs/cpp4r/register: brio, cli, decor, desc, glue, tibble,
-        vctrs
 Config/testthat/edition: 3
 Encoding: UTF-8
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 NeedsCompilation: no
-Packaged: 2025-10-10 21:27:47 UTC; pacha
+Packaged: 2025-12-04 13:20:36 UTC; pacha
 Author: Mauricio Vargas Sepulveda [aut, cre] (ORCID:
     <https://orcid.org/0000-0003-1017-7574>),
   Posit Software, PBC [aut] (Original cpp11 package)
 Maintainer: Mauricio Vargas Sepulveda <m.vargas.sepulveda@gmail.com>
 Repository: CRAN
-Date/Publication: 2025-10-16 18:00:02 UTC
+Date/Publication: 2025-12-04 13:50:02 UTC

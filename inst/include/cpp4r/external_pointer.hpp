@@ -24,14 +24,11 @@ class external_pointer {
 
   static SEXP valid_type(SEXP data) {
     // Pacha: Allow nullable external_pointer (#312)
-    if (__builtin_expect(data == R_NilValue, 0)) {
+    if (data == R_NilValue) {
       return data;
     }
-
-    // Cache the type check to avoid multiple calls
-    SEXPTYPE data_type = detail::r_typeof(data);
-    if (__builtin_expect(data_type != EXTPTRSXP, 0)) {
-      throw type_error(EXTPTRSXP, data_type);
+    if (detail::r_typeof(data) != EXTPTRSXP) {
+      throw type_error(EXTPTRSXP, detail::r_typeof(data));
     }
 
     return data;
@@ -70,40 +67,20 @@ class external_pointer {
     data_ = safe[Rf_shallow_duplicate](rhs.data_);
   }
 
-  external_pointer& operator=(const external_pointer& rhs) {
-    if (this != &rhs) {
-      data_ = safe[Rf_shallow_duplicate](rhs.data_);
-    }
-    return *this;
-  }
+  external_pointer(external_pointer&& rhs) { reset(rhs.release()); }
 
-  // the old external_pointer(external_pointer&& rhs) { reset(rhs.release()); }
-  // affects duckdb [@krlmlr, r-lib/cpp11/pull/423/files]
-  external_pointer(external_pointer&& rhs) noexcept {
-    data_ = rhs.data_;
-    rhs.data_ = R_NilValue;
-  }
+  external_pointer& operator=(external_pointer&& rhs) noexcept { reset(rhs.release()); }
 
-  // same for the old external_pointer& operator=(external_pointer&& rhs) noexcept {
-  // reset(rhs.release()); }
-  external_pointer& operator=(external_pointer&& rhs) noexcept {
-    if (this != &rhs) {
-      data_ = rhs.data_;
-      rhs.data_ = R_NilValue;
-    }
-    return *this;
-  }
-
-  external_pointer& operator=(std::nullptr_t) noexcept {
-    reset();
-    return *this;
-  }
+  external_pointer& operator=(std::nullptr_t) noexcept { reset(); };
 
   operator SEXP() const noexcept { return data_; }
 
   pointer get() const noexcept {
     pointer addr = static_cast<T*>(R_ExternalPtrAddr(data_));
-    return addr;  // No need to check for nullptr twice
+    if (addr == nullptr) {
+      return nullptr;
+    }
+    return addr;
   }
 
   typename std::add_lvalue_reference<T>::type operator*() {
@@ -111,7 +88,7 @@ class external_pointer {
     if (addr == nullptr) {
       throw std::bad_weak_ptr();
     }
-    return *addr;  // Use cached addr instead of calling get() again
+    return *get();
   }
 
   pointer operator->() const {
@@ -119,14 +96,14 @@ class external_pointer {
     if (addr == nullptr) {
       throw std::bad_weak_ptr();
     }
-    return addr;  // Use cached addr instead of calling get() again
+    return get();
   }
 
   pointer release() noexcept {
-    pointer ptr = get();
-    if (ptr == nullptr) {
+    if (get() == nullptr) {
       return nullptr;
     }
+    pointer ptr = get();
     R_ClearExternalPtr(data_);
 
     return ptr;
@@ -134,15 +111,8 @@ class external_pointer {
 
   void reset(pointer ptr = pointer()) {
     SEXP old_data = data_;
-    if (ptr != nullptr) {
-      data_ = safe[R_MakeExternalPtr]((void*)ptr, R_NilValue, R_NilValue);
-    } else {
-      data_ = R_NilValue;
-    }
-    // Clean up old data if it was an external pointer
-    if (old_data != R_NilValue) {
-      r_deleter(old_data);
-    }
+    data_ = safe[R_MakeExternalPtr]((void*)ptr, R_NilValue, R_NilValue);
+    r_deleter(old_data);
   }
 
   void swap(external_pointer& other) noexcept {
@@ -163,42 +133,37 @@ void swap(external_pointer<T, Deleter>& lhs, external_pointer<T, Deleter>& rhs) 
 template <class T, void Deleter(T*)>
 bool operator==(const external_pointer<T, Deleter>& x,
                 const external_pointer<T, Deleter>& y) {
-  // Fast path: direct SEXP comparison
-  SEXP x_sexp = static_cast<SEXP>(x);
-  SEXP y_sexp = static_cast<SEXP>(y);
-  return x_sexp == y_sexp;
+  return x.data_ == y.data_;
 }
 
 template <class T, void Deleter(T*)>
 bool operator!=(const external_pointer<T, Deleter>& x,
                 const external_pointer<T, Deleter>& y) {
-  return !(x == y);
+  return x.data_ != y.data_;
 }
 
 template <class T, void Deleter(T*)>
 bool operator<(const external_pointer<T, Deleter>& x,
                const external_pointer<T, Deleter>& y) {
-  SEXP x_sexp = static_cast<SEXP>(x);
-  SEXP y_sexp = static_cast<SEXP>(y);
-  return x_sexp < y_sexp;
+  return x.data_ < y.data_;
 }
 
 template <class T, void Deleter(T*)>
 bool operator<=(const external_pointer<T, Deleter>& x,
                 const external_pointer<T, Deleter>& y) {
-  return !(y < x);
+  return x.data_ <= y.data_;
 }
 
 template <class T, void Deleter(T*)>
 bool operator>(const external_pointer<T, Deleter>& x,
                const external_pointer<T, Deleter>& y) {
-  return y < x;
+  return x.data_ > y.data_;
 }
 
 template <class T, void Deleter(T*)>
 bool operator>=(const external_pointer<T, Deleter>& x,
                 const external_pointer<T, Deleter>& y) {
-  return !(x < y);
+  return x.data_ >= y.data_;
 }
 
 }  // namespace cpp4r

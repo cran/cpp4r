@@ -1,12 +1,12 @@
 #pragma once
 
-#include <stddef.h>   // for size_t
-#include <stdexcept>  // for invalid_argument
+#include <stddef.h>     // for size_t
+#include <string>       // for string, basic_string
+#include <type_traits>  // for enable_if, is_same, decay
 
-#include <string>  // for string, basic_string
-
-#include "cpp4r/R.hpp"                // for SEXP, SEXPREC, REAL_ELT, R_NilV...
+#include "cpp4r/R.hpp"                // for R’s C interface (e.g., for SEXP)
 #include "cpp4r/attribute_proxy.hpp"  // for attribute_proxy
+#include "cpp4r/cpp_version.hpp"      // for CPP4R_HAS_CXX17
 #include "cpp4r/protect.hpp"          // for store
 
 namespace cpp4r {
@@ -18,25 +18,34 @@ class sexp {
   SEXP preserve_token_ = R_NilValue;
 
  public:
-  sexp() = default;
+  sexp() noexcept = default;
 
-  sexp(SEXP data)
-      : data_(data),
-        preserve_token_(__builtin_expect(data == R_NilValue, 0)
-                            ? R_NilValue
-                            : detail::store::insert(data)) {}
+  sexp(SEXP data) : data_(data), preserve_token_(detail::store::insert(data_)) {}
+
+  // Templated constructor for types with operator SEXP()
+  // This resolves ambiguity in C++14 between sexp(SEXP) and copy/move constructors
+  template <typename T, typename = typename std::enable_if<
+                            !std::is_same<typename std::decay<T>::type, sexp>::value &&
+                            !std::is_same<typename std::decay<T>::type, SEXP>::value &&
+                            std::is_convertible<T, SEXP>::value>::type>
+  sexp(T&& value) {
+#if CPP4R_HAS_CXX17
+    data_ = static_cast<SEXP>(std::forward<T>(value));
+#else
+    data_ = static_cast<SEXP>(value);
+#endif
+    preserve_token_ = detail::store::insert(data_);
+  }
 
   // We maintain our own new `preserve_token_`
-  sexp(const sexp& rhs) : data_(rhs.data_) {
-    // Only insert if data is not R_NilValue to avoid unnecessary work
-    preserve_token_ = __builtin_expect(data_ == R_NilValue, 0)
-                          ? R_NilValue
-                          : detail::store::insert(data_);
+  sexp(const sexp& rhs) {
+    data_ = rhs.data_;
+    preserve_token_ = detail::store::insert(data_);
   }
 
   // We take ownership over the `rhs.preserve_token_`.
   // Importantly we clear it in the `rhs` so it can't release the object upon destruction.
-  sexp(sexp&& rhs) {
+  sexp(sexp&& rhs) noexcept {
     data_ = rhs.data_;
     preserve_token_ = rhs.preserve_token_;
 
@@ -45,39 +54,15 @@ class sexp {
   }
 
   sexp& operator=(const sexp& rhs) {
-    if (__builtin_expect(this != &rhs,
-                         1)) {  // Self-assignment check - expect it's not self-assignment
-      detail::store::release(preserve_token_);
+    detail::store::release(preserve_token_);
 
-      data_ = rhs.data_;
-      preserve_token_ = __builtin_expect(data_ == R_NilValue, 0)
-                            ? R_NilValue
-                            : detail::store::insert(data_);
-    }
+    data_ = rhs.data_;
+    preserve_token_ = detail::store::insert(data_);
 
     return *this;
   }
 
-  sexp& operator=(sexp&& rhs) noexcept {
-    if (__builtin_expect(this != &rhs,
-                         1)) {  // Self-assignment check - expect it's not self-assignment
-      detail::store::release(preserve_token_);
-
-      data_ = rhs.data_;
-      preserve_token_ = rhs.preserve_token_;
-
-      rhs.data_ = R_NilValue;
-      rhs.preserve_token_ = R_NilValue;
-    }
-
-    return *this;
-  }
-
-  ~sexp() {
-    if (__builtin_expect(preserve_token_ != R_NilValue, 1)) {
-      detail::store::release(preserve_token_);
-    }
-  }
+  ~sexp() { detail::store::release(preserve_token_); }
 
   attribute_proxy<sexp> attr(const char* name) const {
     return attribute_proxy<sexp>(*this, name);
@@ -95,58 +80,15 @@ class sexp {
     return attribute_proxy<sexp>(*this, R_NamesSymbol);
   }
 
-  operator SEXP() const { return data_; }
-  SEXP data() const { return data_; }
+  operator SEXP() const noexcept { return data_; }
+  SEXP data() const noexcept { return data_; }
 
-  // Implicit conversion operators for common types
-  operator double() const {
-    if (__builtin_expect(TYPEOF(data_) == REALSXP && Rf_length(data_) == 1, 1)) {
-      return REAL_ELT(data_, 0);
-    }
-    if (__builtin_expect(TYPEOF(data_) == INTSXP && Rf_length(data_) == 1, 0)) {
-      return static_cast<double>(INTEGER_ELT(data_, 0));
-    }
-    throw std::invalid_argument("Cannot convert SEXP to double");
-  }
-
-  operator int() const {
-    if (__builtin_expect(TYPEOF(data_) == INTSXP && Rf_length(data_) == 1, 1)) {
-      return INTEGER_ELT(data_, 0);
-    }
-    if (__builtin_expect(TYPEOF(data_) == REALSXP && Rf_length(data_) == 1, 0)) {
-      double val = REAL_ELT(data_, 0);
-      return static_cast<int>(val);
-    }
-    throw std::invalid_argument("Cannot convert SEXP to int");
-  }
-
-  operator bool() const {
-    if (__builtin_expect(TYPEOF(data_) == LGLSXP && Rf_length(data_) == 1, 1)) {
-      return LOGICAL_ELT(data_, 0) != 0;
-    }
-    throw std::invalid_argument("Cannot convert SEXP to bool");
-  }
-
-  // Optimized comparison operators
-  bool operator==(const sexp& other) const noexcept { return data_ == other.data_; }
-
-  bool operator!=(const sexp& other) const noexcept { return data_ != other.data_; }
-
-  bool operator==(SEXP other) const noexcept { return data_ == other; }
-
-  bool operator!=(SEXP other) const noexcept { return data_ != other; }
+  /// DEPRECATED: Do not use this, it will be removed soon.
+  operator double() const { return REAL_ELT(data_, 0); }
+  /// DEPRECATED: Do not use this, it will be removed soon.
+  operator size_t() const { return REAL_ELT(data_, 0); }
+  /// DEPRECATED: Do not use this, it will be removed soon.
+  operator bool() const { return LOGICAL_ELT(data_, 0); }
 };
-
-// Free function comparison operators for symmetry
-inline bool operator==(SEXP lhs, const sexp& rhs) noexcept { return lhs == rhs.data(); }
-
-inline bool operator!=(SEXP lhs, const sexp& rhs) noexcept { return lhs != rhs.data(); }
-
-// Utility functions for common operations
-inline bool is_null(const sexp& x) noexcept { return x.data() == R_NilValue; }
-
-inline SEXPTYPE sexp_type(const sexp& x) noexcept { return detail::r_typeof(x.data()); }
-
-inline R_xlen_t sexp_length(const sexp& x) noexcept { return Rf_length(x.data()); }
 
 }  // namespace cpp4r

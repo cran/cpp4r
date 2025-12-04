@@ -33,6 +33,7 @@
 // clang-format on
 
 #include <type_traits>
+#include "cpp4r/cpp_version.hpp"  // for CPP4R optimization macros
 
 #if defined(R_VERSION) && R_VERSION >= R_Version(4, 4, 0)
 // Use R's new macro
@@ -49,7 +50,7 @@
 namespace cpp4r {
 namespace literals {
 
-constexpr R_xlen_t operator""_xl(unsigned long long int value) { return value; }
+constexpr R_xlen_t operator""_xl(unsigned long long int value) noexcept { return value; }
 
 }  // namespace literals
 
@@ -66,10 +67,10 @@ namespace detail {
 // which can throw warnings with `-Wsign-compare` on Windows.
 inline SEXPTYPE r_typeof(SEXP x) noexcept { return static_cast<SEXPTYPE>(TYPEOF(x)); }
 
-/// Get an object from an environment
-///
-/// SAFETY: Keep as a pure C function. Call like an R API function, i.e. wrap in `safe[]`
-/// as required.
+// Get an object from an environment
+//
+// SAFETY: Keep as a pure C function. Call like an R API function, i.e. wrap in `safe[]`
+// as required.
 inline SEXP r_env_get(SEXP env, SEXP sym) {
 #if defined(R_VERSION) && R_VERSION >= R_Version(4, 5, 0)
   const Rboolean inherits = FALSE;
@@ -82,7 +83,6 @@ inline SEXP r_env_get(SEXP env, SEXP sym) {
   // - `R_MissingArg` can't leak from an `env` anymore
   // - Promises can't leak from an `env` anymore
 
-  // Most lookups succeed, so optimize for the common case
   if (out == R_MissingArg) {
     Rf_errorcall(R_NilValue, "argument \"%s\" is missing, with no default",
                  CHAR(PRINTNAME(sym)));
@@ -102,10 +102,10 @@ inline SEXP r_env_get(SEXP env, SEXP sym) {
 #endif
 }
 
-/// Check if an object exists in an environment
-///
-/// SAFETY: Keep as a pure C function. Call like an R API function, i.e. wrap in `safe[]`
-/// as required.
+// Check if an object exists in an environment
+//
+// SAFETY: Keep as a pure C function. Call like an R API function, i.e. wrap in `safe[]`
+// as required.
 inline bool r_env_has(SEXP env, SEXP sym) {
 #if R_VERSION >= R_Version(4, 2, 0)
   return R_existsVarInFrame(env, sym);
@@ -119,55 +119,37 @@ inline bool r_env_has(SEXP env, SEXP sym) {
 template <typename T>
 inline T na();
 
+// Progressive C++ optimization: Use if constexpr in C++17+ for zero-overhead type
+// dispatch
+#if CPP4R_HAS_CXX17
 template <typename T>
-inline typename std::enable_if<!std::is_same<typename std::decay<T>::type, double>::value,
-                               bool>::type
-is_na(const T& value) noexcept {
+CPP4R_HOT inline bool is_na(const T& value) {
+  // C++17+: Use if constexpr - compiler only compiles the taken branch
+  if constexpr (std::is_same<typename std::decay<T>::type, double>::value) {
+    return ISNA(value);  // Fast R macro for doubles
+  } else if constexpr (std::is_same<typename std::decay<T>::type, int>::value) {
+    return value == NA_INTEGER;  // Direct comparison for integers
+  } else {
+    return value == na<T>();  // Generic fallback
+  }
+}
+#else
+// C++11/14: Use SFINAE (slower compilation, same runtime performance)
+template <typename T>
+CPP4R_HOT inline
+    typename std::enable_if<!std::is_same<typename std::decay<T>::type, double>::value,
+                            bool>::type
+    is_na(const T& value) {
   return value == na<T>();
 }
 
 template <typename T>
-inline typename std::enable_if<std::is_same<typename std::decay<T>::type, double>::value,
-                               bool>::type
-is_na(const T& value) noexcept {
+CPP4R_HOT inline
+    typename std::enable_if<std::is_same<typename std::decay<T>::type, double>::value,
+                            bool>::type
+    is_na(const T& value) {
   return ISNA(value);
 }
-
-// Fast utility functions for common SEXP operations
-inline bool is_null(SEXP x) noexcept { return x == R_NilValue; }
-
-inline bool is_scalar(SEXP x) noexcept { return Rf_length(x) == 1; }
-
-inline bool is_vector_type(SEXPTYPE type) noexcept {
-  // Most common vector types first for better branch prediction
-  return type == REALSXP || type == INTSXP || type == LGLSXP || type == STRSXP ||
-         type == CPLXSXP || type == RAWSXP;
-}
-
-inline bool is_atomic(SEXP x) noexcept { return is_vector_type(detail::r_typeof(x)); }
-
-// Fast length check with early return for null
-inline R_xlen_t safe_length(SEXP x) noexcept { return is_null(x) ? 0 : Rf_length(x); }
-
-// Optimized type checking with branch prediction
-inline bool is_real(SEXP x) noexcept { return detail::r_typeof(x) == REALSXP; }
-
-inline bool is_integer(SEXP x) noexcept { return detail::r_typeof(x) == INTSXP; }
-
-inline bool is_logical(SEXP x) noexcept { return detail::r_typeof(x) == LGLSXP; }
-
-inline bool is_character(SEXP x) noexcept { return detail::r_typeof(x) == STRSXP; }
-
-inline bool is_complex(SEXP x) noexcept { return detail::r_typeof(x) == CPLXSXP; }
-
-inline bool is_raw(SEXP x) noexcept { return detail::r_typeof(x) == RAWSXP; }
-
-// Fast environment checking
-inline bool is_environment(SEXP x) noexcept { return detail::r_typeof(x) == ENVSXP; }
-
-inline bool is_function(SEXP x) noexcept {
-  SEXPTYPE type = detail::r_typeof(x);
-  return type == CLOSXP || type == BUILTINSXP || type == SPECIALSXP;
-}
+#endif
 
 }  // namespace cpp4r

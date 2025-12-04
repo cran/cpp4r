@@ -6,22 +6,22 @@
 #include <string>   // for string, basic_string
 #include <utility>  // for forward
 
-#include "cpp4r/R.hpp"          // for SEXP, SEXPREC, CDR, Rf_install, SETCAR
+#include "cpp4r/R.hpp"          // for R’s C interface (e.g., for SEXP)
 #include "cpp4r/as.hpp"         // for as_sexp
 #include "cpp4r/named_arg.hpp"  // for named_arg
-#include "cpp4r/protect.hpp"    // for protect, protect::function, safe
+#include "cpp4r/protect.hpp"    // for safe, protect, etc.
 #include "cpp4r/sexp.hpp"       // for sexp
 
 namespace cpp4r {
 
 class function {
  public:
-  inline function(SEXP data) noexcept : data_(data) {}
+  function(SEXP data) : data_(data) {}
 
   template <typename... Args>
-  inline sexp operator()(Args&&... args) const {
+  sexp operator()(Args&&... args) const {
     // Size of the arguments plus one for the function name itself
-    constexpr R_xlen_t num_args = sizeof...(args) + 1;
+    R_xlen_t num_args = sizeof...(args) + 1;
 
     sexp call(safe[Rf_allocVector](LANGSXP, num_args));
 
@@ -34,7 +34,7 @@ class function {
   sexp data_;
 
   template <typename... Args>
-  inline void construct_call(SEXP val, const named_arg& arg, Args&&... args) const {
+  void construct_call(SEXP val, const named_arg& arg, Args&&... args) const {
     SETCAR(val, arg.value());
     SET_TAG(val, safe[Rf_install](arg.name()));
     val = CDR(val);
@@ -43,28 +43,28 @@ class function {
 
   // Construct the call recursively, each iteration adds an Arg to the pairlist.
   template <typename T, typename... Args>
-  inline void construct_call(SEXP val, const T& arg, Args&&... args) const {
+  void construct_call(SEXP val, const T& arg, Args&&... args) const {
     SETCAR(val, as_sexp(arg));
     val = CDR(val);
     construct_call(val, std::forward<Args>(args)...);
   }
 
   // Base case, just return
-  inline void construct_call(SEXP val) const noexcept {}
+  void construct_call(SEXP val) const {}
 };
 
 class package {
  public:
-  inline package(const char* name) : data_(get_namespace(name)) {}
-  inline package(const std::string& name) : data_(get_namespace(name.c_str())) {}
-  inline function operator[](const char* name) {
+  package(const char* name) : data_(get_namespace(name)) {}
+  package(const std::string& name) : data_(get_namespace(name.c_str())) {}
+  function operator[](const char* name) {
     return safe[Rf_findFun](safe[Rf_install](name), data_);
   }
-  inline function operator[](const std::string& name) { return operator[](name.c_str()); }
+  function operator[](const std::string& name) { return operator[](name.c_str()); }
 
  private:
-  static inline SEXP get_namespace(const char* name) {
-    if (__builtin_expect(std::strcmp(name, "base") == 0, 1)) {
+  static SEXP get_namespace(const char* name) {
+    if (strcmp(name, "base") == 0) {
       return R_BaseEnv;
     }
     sexp name_sexp = safe[Rf_install](name);
@@ -106,32 +106,20 @@ inline void r_message(const char* x) {
 }  // namespace detail
 
 inline void message(const char* fmt_arg) {
-#ifdef CPP4R_USE_FMT
-  std::string msg = fmt::format(fmt_arg);
-  safe[detail::r_message](msg.c_str());
-#else
   char buff[1024];
-  int msg;
-  msg = std::snprintf(buff, 1024, "%s", fmt_arg);
+  int msg = std::snprintf(buff, 1024, "%s", fmt_arg);
   if (msg >= 0 && msg < 1024) {
     safe[detail::r_message](buff);
   }
-#endif
 }
 
 template <typename... Args>
 void message(const char* fmt_arg, Args... args) {
-#ifdef CPP4R_USE_FMT
-  std::string msg = fmt::format(fmt_arg, args...);
-  safe[detail::r_message](msg.c_str());
-#else
   char buff[1024];
-  int msg;
-  msg = std::snprintf(buff, 1024, fmt_arg, args...);
+  int msg = std::snprintf(buff, 1024, fmt_arg, args...);
   if (msg >= 0 && msg < 1024) {
     safe[detail::r_message](buff);
   }
-#endif
 }
 
 inline void message(const std::string& fmt_arg) { message(fmt_arg.c_str()); }
