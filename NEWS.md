@@ -1,3 +1,7 @@
+# cpp4r 0.5.0
+
+* Avoids non-API methods when handling data frames (thanks to Luke Tierney for reporting this)
+
 # cpp4r 0.4.0
 
 * Clearer documentation about the C++ workflow (i.e., how to use anticonf to specify a C++ standard)

@@ -1,6 +1,6 @@
-4603c4c9f37adc7c9dbec77fadc84383 *DESCRIPTION
+31c63fe7d9ecbaca74974c378477b3c2 *DESCRIPTION
 2b3f3aef7dd3e25df19067d385ba08c6 *NAMESPACE
-9358a82a80c315fde54295bbfdf03ae7 *NEWS.md
+01d734ef3cf1d3e8321f15e3c6233971 *NEWS.md
 b4fe12876c37f8a22cde06e9701eecf0 *R/cpp4r-package.R
 4d03937340bdb0dcade214ff78eccd38 *R/register.R
 bd32cd77db08fda72b3b2f67f0268ea0 *R/template.R
@@ -28,7 +28,7 @@ fc8c139ff7831eaaef79c6034136ead3 *inst/include/cpp4r/as.hpp
 853c22baf58742c66bda49930a8f528e *inst/include/cpp4r/attribute_proxy.hpp
 fbbdb91d9a7910ab00dea65470ed5cc4 *inst/include/cpp4r/complexes.hpp
 8f0b8d8bcdee9f673319d3593e1f0598 *inst/include/cpp4r/cpp_version.hpp
-2e349dd06f8e0a7b411b1cfd291ba672 *inst/include/cpp4r/data_frame.hpp
+2217f59dd31ab2eac315fdb7b848db87 *inst/include/cpp4r/data_frame.hpp
 cf2c4df47f3c45c734cfcebbe083c27b *inst/include/cpp4r/declarations.hpp
 60f45cb18210693252f44948100cd85c *inst/include/cpp4r/doubles.hpp
 851a0bc63c5fd0cdcde81eaf2c5c27e3 *inst/include/cpp4r/environment.hpp

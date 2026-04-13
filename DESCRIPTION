@@ -1,6 +1,6 @@
 Package: cpp4r
 Title: Header-Only 'C++' and 'R' Interface
-Version: 0.4.0
+Version: 0.5.0
 Authors@R: c(
     person("Mauricio", "Vargas Sepulveda", , "m.vargas.sepulveda@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-1017-7574")),
@@ -24,10 +24,10 @@ Config/testthat/edition: 3
 Encoding: UTF-8
 RoxygenNote: 7.3.3
 NeedsCompilation: no
-Packaged: 2025-12-04 13:20:36 UTC; pacha
+Packaged: 2026-04-12 20:48:03 UTC; pacha
 Author: Mauricio Vargas Sepulveda [aut, cre] (ORCID:
     <https://orcid.org/0000-0003-1017-7574>),
   Posit Software, PBC [aut] (Original cpp11 package)
 Maintainer: Mauricio Vargas Sepulveda <m.vargas.sepulveda@gmail.com>
 Repository: CRAN
-Date/Publication: 2025-12-04 13:50:02 UTC
+Date/Publication: 2026-04-13 05:40:02 UTC
