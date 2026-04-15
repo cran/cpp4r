@@ -1,6 +1,6 @@
-31c63fe7d9ecbaca74974c378477b3c2 *DESCRIPTION
+e851f72de4409639f05968a41e97fe60 *DESCRIPTION
 2b3f3aef7dd3e25df19067d385ba08c6 *NAMESPACE
-01d734ef3cf1d3e8321f15e3c6233971 *NEWS.md
+6f467db1779d0ae7b72028f71c6aab3a *NEWS.md
 b4fe12876c37f8a22cde06e9701eecf0 *R/cpp4r-package.R
 4d03937340bdb0dcade214ff78eccd38 *R/register.R
 bd32cd77db08fda72b3b2f67f0268ea0 *R/template.R
@@ -33,7 +33,7 @@ cf2c4df47f3c45c734cfcebbe083c27b *inst/include/cpp4r/declarations.hpp
 60f45cb18210693252f44948100cd85c *inst/include/cpp4r/doubles.hpp
 851a0bc63c5fd0cdcde81eaf2c5c27e3 *inst/include/cpp4r/environment.hpp
 17cdafe08f416314d7cc8c5590e1671f *inst/include/cpp4r/external_pointer.hpp
-0574c2b7269f17dbbb0f2e091184a59b *inst/include/cpp4r/function.hpp
+467d77071222ff21c7792fc1e9e8d5f5 *inst/include/cpp4r/function.hpp
 2cd7d1da4aded29a8b19c3a3b719d74d *inst/include/cpp4r/integers.hpp
 5cf2b1fa1bebaf7d8e23f82d01d87cfe *inst/include/cpp4r/list.hpp
 973e1f053676a72f912ec63e4e7d2d1a *inst/include/cpp4r/list_of.hpp
