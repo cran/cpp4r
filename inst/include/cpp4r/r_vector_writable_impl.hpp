@@ -194,8 +194,17 @@ inline void r_vector<T>::named_arg_assign_elt(R_xlen_t i, underlying_type elt,
 
 // Optimized size constructor using fast-path allocation
 template <typename T>
-CPP4R_ALWAYS_INLINE r_vector<T>::r_vector(const R_xlen_t size)
-    : r_vector(safe[Rf_allocVector](get_sexptype(), size), fresh_allocation_tag{}) {}
+CPP4R_ALWAYS_INLINE r_vector<T>::r_vector(const R_xlen_t size) : cpp4r::r_vector<T>() {
+  SEXP data = Rf_allocVector(get_sexptype(), size);
+  PROTECT(data);
+  capacity_ = size;
+  data_ = data;
+  protect_ = detail::store::insert(data);
+  UNPROTECT(1);
+  is_altrep_ = false;
+  data_p_ = get_p(false, data);
+  length_ = size;
+}
 
 template <typename T>
 template <typename Iter>
@@ -346,9 +355,17 @@ inline typename r_vector<T>::reference r_vector<T>::operator[](
   SEXP names = PROTECT(this->names());
   R_xlen_t size = Rf_xlength(names);
 
+  // Fast path: CHARSXP pointer equality.
   for (R_xlen_t pos = 0; pos < size; ++pos) {
-    auto cur = Rf_translateCharUTF8(STRING_ELT(names, pos));
-    if (name == cur) {
+    if (name == STRING_ELT(names, pos)) {
+      UNPROTECT(1);
+      return operator[](pos);
+    }
+  }
+
+  // Slow path: translate and compare.
+  for (R_xlen_t pos = 0; pos < size; ++pos) {
+    if (name == Rf_translateCharUTF8(STRING_ELT(names, pos))) {
       UNPROTECT(1);
       return operator[](pos);
     }
@@ -519,9 +536,17 @@ inline typename r_vector<T>::iterator r_vector<T>::find(const r_string& name) co
   SEXP names = PROTECT(this->names());
   R_xlen_t size = Rf_xlength(names);
 
+  // Fast path: CHARSXP pointer equality.
   for (R_xlen_t pos = 0; pos < size; ++pos) {
-    auto cur = Rf_translateCharUTF8(STRING_ELT(names, pos));
-    if (name == cur) {
+    if (name == STRING_ELT(names, pos)) {
+      UNPROTECT(1);
+      return begin() + pos;
+    }
+  }
+
+  // Slow path: translate and compare.
+  for (R_xlen_t pos = 0; pos < size; ++pos) {
+    if (name == Rf_translateCharUTF8(STRING_ELT(names, pos))) {
       UNPROTECT(1);
       return begin() + pos;
     }

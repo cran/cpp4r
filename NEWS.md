@@ -1,3 +1,12 @@
+# cpp4r 0.6.0
+
+* `register()` now captures the C++ namespace of decorated functions and emits fully-qualified declarations and calls, so functions defined inside a `namespace { ... }` block (or written as `ns::fun`) can be registered without further setup.
+* Removed the run-time dependency on the `decor`, `tibble`, and `vctrs` packages; the small subset of helpers that `register()` relies on is now bundled internally and uses base `data.frame`.
+* Adds fast paths that provide slight speed improvements (e.g., avoiding branching)
+* Follows, to the best possible extent, the R's C API description from https://github.com/hadley/r-internals.
+* Slightly expanded `cpp4r::function`.
+* Fixed two empty tests.
+
 # cpp4r 0.5.1
 
 * Luke Tierney pointed out a similar change as in v0.5.0 to add to function.hpp.

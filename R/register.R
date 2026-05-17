@@ -44,10 +44,10 @@ register <- function(path = NULL, quiet = !is_interactive(), extension = c(".cpp
   unlink(c(r_path, cpp_path))
 
   suppressWarnings(
-    all_decorations <- decor::cpp_decorations(path, is_attribute = TRUE)
+    all_decorations <- cpp_decorations(path, is_attribute = TRUE)
   )
 
-  if (nrow(all_decorations) == 0) {
+  if (length(all_decorations$file) == 0) {
     return(invisible(character()))
   }
 
@@ -77,9 +77,27 @@ register <- function(path = NULL, quiet = !is_interactive(), extension = c(".cpp
 
   call_entries <- get_call_entries(path, funs$name, package)
 
+  fun_guards <- stats::setNames(
+    mapply(get_preprocessor_guard, funs$file, funs$line, SIMPLIFY = FALSE),
+    funs$name
+  )
+  guarded_names <- names(fun_guards)[!vapply(fun_guards, is.null, logical(1))]
+  if (length(guarded_names) > 0) {
+    call_entries <- vapply(call_entries, function(line) {
+      matched <- guarded_names[vapply(guarded_names, function(nm) {
+        grepl(paste0("_", package, "_", nm), line, fixed = TRUE)
+      }, logical(1))]
+      if (length(matched) > 0) {
+        paste0(fun_guards[[matched[1]]], "\n", line, "\n#endif")
+      } else {
+        line
+      }
+    }, character(1), USE.NAMES = FALSE)
+  }
+
   cpp_function_registration <- glue::glue_data(funs, '    {{
     "_cpp4r_{name}", (DL_FUNC) &_{package}_{name}, {n_args}}}, ',
-    n_args = viapply(funs$args, nrow)
+    n_args = viapply(funs$args, \(x) length(x$name))
   )
 
   cpp_function_registration <- glue::glue_collapse(cpp_function_registration, sep = "\n")
@@ -133,21 +151,55 @@ register <- function(path = NULL, quiet = !is_interactive(), extension = c(".cpp
   invisible(c(r_path, cpp_path))
 }
 
-utils::globalVariables(c("name", "return_type", "line", "decoration", "context", ".", "functions", "res"))
+utils::globalVariables(c("name", "cpp_name", "return_type", "line", "decoration", "context", ".", "functions", "res"))
+
+empty_registered <- function() {
+  list(
+    file = character(),
+    line = integer(),
+    decoration = character(),
+    namespace = character(),
+    params = list(),
+    context = list(),
+    name = character(),
+    cpp_name = character(),
+    return_type = character(),
+    args = list()
+  )
+}
 
 get_registered_functions <- function(decorations, tag, quiet = !is_interactive()) {
-  if (NROW(decorations) == 0) {
-    return(tibble::tibble(file = character(), line = integer(), decoration = character(), params = list(), context = list(), name = character(), return_type = character(), args = list()))
+  if (length(decorations$file) == 0) {
+    return(empty_registered())
   }
 
-  out <- decorations[decorations$decoration == tag, ]
-  out$functions <- lapply(out$context, decor::parse_cpp_function, is_attribute = TRUE)
-  out <- vctrs::vec_cbind(out, vctrs::vec_rbind(!!!out$functions))
+  idx <- decorations$decoration == tag
+  out <- lapply(decorations, `[`, idx)
+  if (length(out$file) == 0) {
+    return(empty_registered())
+  }
 
-  out <- out[!(names(out) %in% "functions")]
+  parsed <- lapply(out$context, parse_cpp_function, is_attribute = TRUE)
+
+  parsed_name <- vcapply(parsed, function(x) if (length(x$name)) x$name else NA_character_)
+  parsed_ret <- vcapply(parsed, function(x) if (length(x$name)) x$return_type else NA_character_)
+  parsed_args <- lapply(parsed, function(x) if (length(x$name)) x$args else empty_args())
+  # `cpp_name` is the fully-qualified C++ name used in declarations and calls;
+  # `name` is the trailing identifier used for R-side names and C symbols.
+  cpp_name <- ifelse(
+    nzchar(out$namespace) & !is.na(parsed_name),
+    paste0(out$namespace, "::", parsed_name),
+    parsed_name
+  )
+  simple_name <- sub(".*::", "", parsed_name)
+
+  out$name <- simple_name
+  out$cpp_name <- cpp_name
+  out$return_type <- parsed_ret
+  out$args <- parsed_args
   out$decoration <- sub("::[[:alpha:]]+", "", out$decoration)
 
-  n <- nrow(out)
+  n <- length(out$file)
 
   if (!quiet && n > 0) {
     message("i ", n, " functions decorated with [[", tag, "]]")
@@ -157,17 +209,21 @@ get_registered_functions <- function(decorations, tag, quiet = !is_interactive()
 }
 
 generate_cpp_functions <- function(funs, package = "cpp4r") {
-  funs <- funs[c("name", "return_type", "args", "file", "line", "decoration")]
+  cols <- c("name", "cpp_name", "return_type", "args", "file", "line", "decoration")
+  if (!"cpp_name" %in% names(funs)) {
+    funs$cpp_name <- funs$name
+  }
+  funs <- funs[cols]
   funs$real_params <- vcapply(funs$args, glue_collapse_data, "{type} {name}")
   funs$sexp_params <- vcapply(funs$args, glue_collapse_data, "SEXP {name}")
-  funs$calls <- mapply(wrap_call, funs$name, funs$return_type, funs$args, SIMPLIFY = TRUE)
+  funs$calls <- mapply(wrap_call, funs$cpp_name, funs$return_type, funs$args, SIMPLIFY = TRUE)
   funs$package <- package
 
   out <- glue::glue_data(
     funs,
     '
     // {basename(file)}
-    {return_type} {name}({real_params});
+    {return_type} {cpp_name}({real_params});
     extern "C" SEXP _{package}_{name}({sexp_params}) {{
       BEGIN_CPP4R
       {calls}
@@ -175,23 +231,32 @@ generate_cpp_functions <- function(funs, package = "cpp4r") {
     }}
     '
   )
+
+  guards <- mapply(get_preprocessor_guard, funs$file, funs$line, SIMPLIFY = FALSE)
+  out <- mapply(function(code, guard) {
+    if (!is.null(guard)) paste0(guard, "\n", code, "\n#endif") else as.character(code)
+  }, out, guards, SIMPLIFY = TRUE)
+
   out <- glue::glue_collapse(out, sep = "\n")
   unclass(out)
 }
 
 generate_init_functions <- function(funs) {
-  if (nrow(funs) == 0) {
+  if (length(funs$name) == 0) {
     return(list(declarations = "", calls = ""))
   }
 
-  funs <- funs[c("name", "return_type", "args", "file", "line", "decoration")]
+  if (!"cpp_name" %in% names(funs)) {
+    funs$cpp_name <- funs$name
+  }
+  funs <- funs[c("name", "cpp_name", "return_type", "args", "file", "line", "decoration")]
   funs$declaration_params <- vcapply(funs$args, glue_collapse_data, "{type} {name}")
   funs$call_params <- vcapply(funs$args, `[[`, "name")
 
   declarations <- glue::glue_data(
     funs,
     "
-    {return_type} {name}({declaration_params});
+    {return_type} {cpp_name}({declaration_params});
     "
   )
 
@@ -200,7 +265,7 @@ generate_init_functions <- function(funs) {
   calls <- glue::glue_data(
     funs,
     "
-      {name}({call_params});
+      {cpp_name}({call_params});
     "
   )
   calls <- paste0("\n", glue::glue_collapse(calls, "\n"))
@@ -226,7 +291,7 @@ generate_r_functions <- function(funs, package = "cpp4r", use_package = FALSE) {
 
   # Extract default values and create parameter lists
   funs$param_info <- lapply(funs$args, function(args_df) {
-    if (nrow(args_df) == 0) {
+    if (length(args_df$name) == 0) {
       return(list(params = "", args = "", checks = ""))
     }
 
@@ -386,7 +451,7 @@ extract_roxygen_comments <- function(file) {
   })
 
   # Remove NULL entries
-  roxygen_comments[!sapply(roxygen_comments, is.null)]
+  roxygen_comments[!vapply(roxygen_comments, is.null, logical(1))]
 }
 
 wrap_call <- function(name, return_type, args) {
@@ -396,6 +461,31 @@ wrap_call <- function(name, return_type, args) {
   } else {
     unclass(glue::glue("  return cpp4r::as_sexp({call});"))
   }
+}
+
+get_preprocessor_guard <- function(file, line) {
+  if (!file.exists(file)) {
+    return(NULL)
+  }
+  lines <- readLines(file, warn = FALSE)
+  if (line > length(lines)) {
+    return(NULL)
+  }
+
+  depth <- 0
+  for (i in rev(seq_len(line - 1))) {
+    l <- trimws(lines[i])
+    if (grepl("^#\\s*endif\\b", l)) {
+      depth <- depth + 1
+    } else if (grepl("^#\\s*(ifndef|ifdef|if)\\b", l)) {
+      if (depth == 0) {
+        return(l)
+      }
+      depth <- depth - 1
+    }
+  }
+
+  NULL
 }
 
 get_call_entries <- function(path, names, package) {
