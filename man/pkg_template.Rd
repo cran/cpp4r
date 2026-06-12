@@ -15,7 +15,7 @@ pkg_template(path = NULL, pkgname = NULL)
 The file path to the copied template (invisibly).
 }
 \description{
-This function copies a package template into a new directory.
+Copies a package template into a new directory.
 The template includes a DESCRIPTION file, a minimal R/ directory and placeholders
 with instructions. You can then edit these files to customize your new package.
 }
