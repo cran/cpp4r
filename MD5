@@ -1,6 +1,6 @@
-dac3c6db6ae3eb5b3d54afecd7c13afa *DESCRIPTION
+0289d8c7516a9d4fd2ce401ca0639aca *DESCRIPTION
 2b3f3aef7dd3e25df19067d385ba08c6 *NAMESPACE
-8b117470c3838dcf33fdf892505466d0 *NEWS.md
+de7287f33f4e6c6f426358812ca0c345 *NEWS.md
 b4fe12876c37f8a22cde06e9701eecf0 *R/cpp4r-package.R
 71e6b871785d86e5292bfb6136919d31 *R/decorations.R
 692d88466085b5c3f7e73c88bff4aa52 *R/register.R
@@ -34,7 +34,7 @@ cf2c4df47f3c45c734cfcebbe083c27b *inst/include/cpp4r/declarations.hpp
 447c8d4fbe8d976f2f732563b0535a41 *inst/include/cpp4r/doubles.hpp
 f13ad4bd65c29b39da7862ee1fde1729 *inst/include/cpp4r/environment.hpp
 17cdafe08f416314d7cc8c5590e1671f *inst/include/cpp4r/external_pointer.hpp
-a1262080b070fb6f48d3b6b9bb9bcb64 *inst/include/cpp4r/function.hpp
+858e4e4aaf41ec6e20cb01c12cc92ea9 *inst/include/cpp4r/function.hpp
 025bba12565be62dae53302dc76f28b4 *inst/include/cpp4r/integers.hpp
 453e4f37bb0ebf706a4897bf5effe386 *inst/include/cpp4r/list.hpp
 5d6f845c31db60e44d129651b4d85566 *inst/include/cpp4r/list_of.hpp
@@ -47,7 +47,7 @@ e73e1f8959e997e7e6a38268aabdd6ce *inst/include/cpp4r/logicals.hpp
 f0c5f90a734776b4bd837d71749895cd *inst/include/cpp4r/r_complex.hpp
 8a2f1145735b6ba7eddd952655cec801 *inst/include/cpp4r/r_string.hpp
 679251657594b9206a492ea32fb2913e *inst/include/cpp4r/r_vector.hpp
-369ecef1d839852fa437091b1df7f86e *inst/include/cpp4r/r_vector_fwd.hpp
+cc5e9a6f892fccb7604f6aa03e0a5b65 *inst/include/cpp4r/r_vector_fwd.hpp
 d5bc5695be23015127a82838d834eb47 *inst/include/cpp4r/r_vector_impl.hpp
 55430ba6dcaaf456be28629a4deb55e8 *inst/include/cpp4r/r_vector_writable_impl.hpp
 6aa46b7917b75731aac75e98c8b79215 *inst/include/cpp4r/raws.hpp
